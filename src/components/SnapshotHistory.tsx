@@ -84,20 +84,39 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
       
       // Fetch the file
       const response = await fetch(url);
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch file');
+      }
+      
       const arrayBuffer = await response.arrayBuffer();
       
-      // Determine content type from file extension
+      // Force PDF content type for .pdf files
       const contentType = filePath.endsWith('.pdf') ? 'application/pdf' : 'text/html';
       
-      // Create a blob with the appropriate content type
+      // Create a blob with explicit content type
       const blob = new Blob([arrayBuffer], { type: contentType });
-      const blobUrl = window.URL.createObjectURL(blob);
       
-      // Open in new tab
-      window.open(blobUrl, '_blank');
+      // Create object URL
+      const blobUrl = URL.createObjectURL(blob);
+      
+      // Create a temporary link and click it to trigger download/view with correct type
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      
+      // This helps the browser recognize it as PDF
+      if (contentType === 'application/pdf') {
+        link.type = 'application/pdf';
+      }
+      
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       
       // Clean up blob URL after a delay
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     } catch (error) {
       console.error('Error viewing file:', error);
       toast({

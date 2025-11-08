@@ -186,6 +186,7 @@ serve(async (req) => {
         .from('content-pdfs')
         .upload(fileName, fileBlob, {
           contentType: fileType,
+          cacheControl: '3600',
           upsert: false
         });
       
