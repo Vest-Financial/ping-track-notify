@@ -4,7 +4,14 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
-import { Code, Eye } from "lucide-react";
+import { Code, FileText } from "lucide-react";
+
+// Helper function to extract text from HTML
+const extractTextFromHtml = (html: string): string => {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  return doc.body.textContent || doc.body.innerText || '';
+};
 
 interface ViewContentDialogProps {
   open: boolean;
@@ -21,7 +28,7 @@ interface ViewContentDialogProps {
 }
 
 export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: ViewContentDialogProps) => {
-  const [viewMode, setViewMode] = useState<"rendered" | "raw">("rendered");
+  const [viewMode, setViewMode] = useState<"text" | "raw">("text");
   
   if (!snapshot) return null;
 
@@ -47,11 +54,11 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
             <div className="flex gap-2">
               <Button
                 size="sm"
-                variant={viewMode === "rendered" ? "default" : "outline"}
-                onClick={() => setViewMode("rendered")}
+                variant={viewMode === "text" ? "default" : "outline"}
+                onClick={() => setViewMode("text")}
               >
-                <Eye className="h-4 w-4 mr-1" />
-                Rendered
+                <FileText className="h-4 w-4 mr-1" />
+                Text
               </Button>
               <Button
                 size="sm"
@@ -59,7 +66,7 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
                 onClick={() => setViewMode("raw")}
               >
                 <Code className="h-4 w-4 mr-1" />
-                Raw
+                Raw HTML
               </Button>
             </div>
           </div>
@@ -84,22 +91,17 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
           </DialogDescription>
         </DialogHeader>
 
-        {viewMode === "rendered" ? (
-          <div className="h-[60vh] w-full rounded-md border bg-white">
-            <iframe
-              srcDoc={snapshot.content_text || '<p>No content available</p>'}
-              className="w-full h-full rounded-md"
-              sandbox="allow-same-origin"
-              title="Rendered content"
-            />
-          </div>
-        ) : (
-          <ScrollArea className="h-[60vh] w-full rounded-md border p-4">
+        <ScrollArea className="h-[60vh] w-full rounded-md border p-4">
+          {viewMode === "text" ? (
+            <div className="text-sm whitespace-pre-wrap break-words leading-relaxed">
+              {extractTextFromHtml(snapshot.content_text || 'No content available')}
+            </div>
+          ) : (
             <pre className="text-sm whitespace-pre-wrap break-words">
               {snapshot.content_text || 'No content available'}
             </pre>
-          </ScrollArea>
-        )}
+          )}
+        </ScrollArea>
       </DialogContent>
     </Dialog>
   );
