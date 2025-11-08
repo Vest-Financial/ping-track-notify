@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Trash2, ExternalLink, Clock, AlertCircle, FileText } from "lucide-react";
+import { RefreshCw, Trash2, ExternalLink, Clock, AlertCircle, FileText, History } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { ViewContentDialog } from "@/components/ViewContentDialog";
+import { SnapshotHistory } from "@/components/SnapshotHistory";
 
 interface MonitoredUrl {
   id: string;
@@ -36,6 +37,7 @@ export const UrlList = () => {
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState<string | null>(null);
   const [viewingContent, setViewingContent] = useState<{ urlId: string; urlName: string } | null>(null);
+  const [viewingHistory, setViewingHistory] = useState<{ urlId: string; urlName: string } | null>(null);
   const { toast } = useToast();
 
   const loadUrls = async () => {
@@ -220,6 +222,14 @@ export const UrlList = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => setViewingHistory({ urlId: url.id, urlName: url.name || url.url })}
+                  title="View history"
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => handleCheckNow(url.id)}
                   disabled={checkingId === url.id}
                   title="Check now"
@@ -278,6 +288,13 @@ export const UrlList = () => {
         onOpenChange={(open) => !open && setViewingContent(null)}
         snapshot={viewingContent ? snapshots[viewingContent.urlId] : null}
         urlName={viewingContent?.urlName || ""}
+      />
+
+      <SnapshotHistory
+        open={!!viewingHistory}
+        onOpenChange={(open) => !open && setViewingHistory(null)}
+        urlId={viewingHistory?.urlId || ""}
+        urlName={viewingHistory?.urlName || ""}
       />
     </div>
   );
