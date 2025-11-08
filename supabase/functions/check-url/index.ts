@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
-import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
+import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,34 +127,49 @@ serve(async (req) => {
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
-        // For HTML, we'll use a headless browser service to convert to PDF
-        console.log('Converting HTML to PDF using Browserless...');
+        // For HTML, convert to PDF using jsPDF
+        console.log('Converting HTML to PDF...');
         const htmlContent = await responseClone.text();
         
         try {
-          // Use Browserless.io API to convert HTML to PDF
-          const browserlessResponse = await fetch('https://chrome.browserless.io/pdf', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              html: htmlContent,
-              options: {
-                printBackground: true,
-                format: 'A4',
-              }
-            })
+          // Strip HTML tags and extract text content
+          const textContent = htmlContent
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+          
+          // Create PDF with jsPDF
+          const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
           });
           
-          if (browserlessResponse.ok) {
-            fileBuffer = await browserlessResponse.arrayBuffer();
-            fileType = 'application/pdf';
-            fileName = `${sanitizedUrl}_${timestamp}.pdf`;
-            console.log('HTML converted to PDF successfully');
-          } else {
-            throw new Error('Browserless conversion failed');
+          doc.setFontSize(10);
+          const pageWidth = doc.internal.pageSize.getWidth() - 20;
+          const pageHeight = doc.internal.pageSize.getHeight() - 20;
+          const lineHeight = 5;
+          
+          const lines = doc.splitTextToSize(textContent, pageWidth);
+          
+          let y = 10;
+          for (let i = 0; i < lines.length; i++) {
+            if (y > pageHeight) {
+              doc.addPage();
+              y = 10;
+            }
+            doc.text(lines[i], 10, y);
+            y += lineHeight;
           }
+          
+          // Get PDF as Uint8Array and convert to ArrayBuffer
+          const pdfBytes = doc.output('arraybuffer');
+          fileBuffer = pdfBytes;
+          fileType = 'application/pdf';
+          fileName = `${sanitizedUrl}_${timestamp}.pdf`;
+          console.log('HTML converted to PDF successfully');
         } catch (error) {
           console.error('PDF conversion failed:', error);
           // Fallback: store as HTML
