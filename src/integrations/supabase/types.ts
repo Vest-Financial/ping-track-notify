@@ -24,6 +24,7 @@ export type Database = {
           created_at: string | null
           id: string
           monitored_url_id: string
+          pdf_file_path: string | null
           resolved: boolean | null
           resolved_at: string | null
           status_code: number | null
@@ -37,6 +38,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           monitored_url_id: string
+          pdf_file_path?: string | null
           resolved?: boolean | null
           resolved_at?: string | null
           status_code?: number | null
@@ -50,6 +52,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           monitored_url_id?: string
+          pdf_file_path?: string | null
           resolved?: boolean | null
           resolved_at?: string | null
           status_code?: number | null

@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DiffViewer } from "./DiffViewer";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
+import { ExternalLink } from "lucide-react";
 
 interface Snapshot {
   id: string;
@@ -20,6 +21,7 @@ interface Snapshot {
   alert_triggered: string;
   change_percentage: number;
   resolved: boolean;
+  pdf_file_path: string | null;
 }
 
 interface SnapshotHistoryProps {
@@ -65,6 +67,12 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
     } finally {
       setLoading(false);
     }
+  };
+
+  const getFileUrl = (filePath: string | null) => {
+    if (!filePath) return null;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/content-pdfs/${filePath}`;
   };
 
   useEffect(() => {
@@ -241,6 +249,19 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
                           <span>Change: {(snapshot.change_percentage * 100).toFixed(1)}%</span>
                         )}
                       </div>
+                      {snapshot.pdf_file_path && (
+                        <div className="mt-1">
+                          <a
+                            href={getFileUrl(snapshot.pdf_file_path)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                          >
+                            View Captured File
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     <Button

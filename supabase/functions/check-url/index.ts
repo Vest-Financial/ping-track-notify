@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
+import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -42,7 +43,7 @@ serve(async (req) => {
   try {
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
     const { urlId } = await req.json();
@@ -66,6 +67,9 @@ serve(async (req) => {
     const response = await fetch(monitoredUrl.url);
     const statusCode = response.status;
     const contentType = response.headers.get('content-type') || '';
+    
+    // Clone response to use body twice (once for PDF storage, once for text extraction)
+    const responseClone = response.clone();
 
     console.log(`Content-Type: ${contentType}`);
 
@@ -105,6 +109,50 @@ serve(async (req) => {
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // Store PDF file in storage
+    let pdfFilePath: string | null = null;
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const sanitizedUrl = monitoredUrl.url.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
+    
+    try {
+      let fileBuffer: ArrayBuffer;
+      let fileType: string;
+      let fileName: string;
+      
+      if (contentType.includes('application/pdf')) {
+        // Already a PDF, just store it
+        fileBuffer = await responseClone.arrayBuffer();
+        fileType = 'application/pdf';
+        fileName = `${sanitizedUrl}_${timestamp}.pdf`;
+      } else {
+        // For HTML, store the full HTML content for reference
+        const htmlContent = await responseClone.text();
+        const htmlBytes = encoder.encode(htmlContent);
+        fileBuffer = htmlBytes.buffer;
+        fileType = 'text/html';
+        fileName = `${sanitizedUrl}_${timestamp}.html`;
+      }
+      
+      const fileBlob = new Blob([fileBuffer], { type: fileType });
+      
+      const { error: uploadError } = await supabaseClient.storage
+        .from('content-pdfs')
+        .upload(fileName, fileBlob, {
+          contentType: fileType,
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('Failed to upload file:', uploadError);
+      } else {
+        pdfFilePath = fileName;
+        console.log(`Stored file: ${fileName}`);
+      }
+    } catch (fileError) {
+      console.error('Error storing file:', fileError);
+      // Continue without file storage - don't fail the entire check
+    }
 
     // Get the last snapshot
     const { data: lastSnapshot } = await supabaseClient
@@ -168,6 +216,7 @@ serve(async (req) => {
         status_code: statusCode,
         alert_triggered: alertLevel,
         change_percentage: changePercentage,
+        pdf_file_path: pdfFilePath,
       });
 
     if (snapshotError) {

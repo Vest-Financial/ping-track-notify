@@ -8,6 +8,7 @@ import { Code, FileText, GitCompare, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DiffViewer } from "./DiffViewer";
 import { useToast } from "@/hooks/use-toast";
+import { ExternalLink } from "lucide-react";
 
 // Helper function to extract text from HTML
 const extractTextFromHtml = (html: string): string => {
@@ -41,6 +42,7 @@ interface FullSnapshot {
   change_percentage: number;
   resolved: boolean;
   resolved_at: string | null;
+  pdf_file_path: string | null;
 }
 
 export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: ViewContentDialogProps) => {
@@ -114,6 +116,12 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
     } finally {
       setIsResolving(false);
     }
+  };
+
+  const getFileUrl = (filePath: string | null) => {
+    if (!filePath) return null;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    return `${supabaseUrl}/storage/v1/object/public/content-pdfs/${filePath}`;
   };
   
   if (!snapshot) return null;
@@ -195,6 +203,17 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
               <span className="text-muted-foreground">
                 Change: {(snapshot.change_percentage * 100).toFixed(1)}%
               </span>
+            )}
+            {fullSnapshot?.pdf_file_path && (
+              <a
+                href={getFileUrl(fullSnapshot.pdf_file_path)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline inline-flex items-center gap-1 text-sm"
+              >
+                View Captured File
+                <ExternalLink className="h-3 w-3" />
+              </a>
             )}
           </DialogDescription>
         </DialogHeader>
