@@ -133,7 +133,10 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
       
       // Fetch and create blob URL to bypass ad blocker
       const response = await fetch(url);
-      const blob = await response.blob();
+      const arrayBuffer = await response.arrayBuffer();
+      
+      // Create a blob with explicit PDF content type
+      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
       const blobUrl = window.URL.createObjectURL(blob);
       
       // Open in new tab
