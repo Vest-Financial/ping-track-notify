@@ -4,8 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { RefreshCw, Trash2, ExternalLink, Clock, AlertCircle } from "lucide-react";
+import { RefreshCw, Trash2, ExternalLink, Clock, AlertCircle, FileText } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { ViewContentDialog } from "@/components/ViewContentDialog";
 
 interface MonitoredUrl {
   id: string;
@@ -23,6 +24,9 @@ interface LatestSnapshot {
   alert_triggered: string;
   change_percentage: number;
   created_at: string;
+  content_text: string;
+  content_length: number;
+  status_code: number;
 }
 
 export const UrlList = () => {
@@ -30,6 +34,7 @@ export const UrlList = () => {
   const [snapshots, setSnapshots] = useState<Record<string, LatestSnapshot>>({});
   const [loading, setLoading] = useState(true);
   const [checkingId, setCheckingId] = useState<string | null>(null);
+  const [viewingContent, setViewingContent] = useState<{ urlId: string; urlName: string } | null>(null);
   const { toast } = useToast();
 
   const loadUrls = async () => {
@@ -47,7 +52,7 @@ export const UrlList = () => {
         for (const url of data) {
           const { data: snapshotData } = await supabase
             .from("content_snapshots")
-            .select("alert_triggered, change_percentage, created_at")
+            .select("alert_triggered, change_percentage, created_at, content_text, content_length, status_code")
             .eq("monitored_url_id", url.id)
             .order("created_at", { ascending: false })
             .limit(1)
@@ -204,8 +209,18 @@ export const UrlList = () => {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => setViewingContent({ urlId: url.id, urlName: url.name || url.url })}
+                  disabled={!snapshots[url.id]}
+                  title="View latest content"
+                >
+                  <FileText className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => handleCheckNow(url.id)}
                   disabled={checkingId === url.id}
+                  title="Check now"
                 >
                   <RefreshCw className={`h-4 w-4 ${checkingId === url.id ? "animate-spin" : ""}`} />
                 </Button>
@@ -213,6 +228,7 @@ export const UrlList = () => {
                   size="sm"
                   variant="outline"
                   onClick={() => handleDelete(url.id)}
+                  title="Delete"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
@@ -254,6 +270,13 @@ export const UrlList = () => {
           </CardContent>
         </Card>
       ))}
+
+      <ViewContentDialog
+        open={!!viewingContent}
+        onOpenChange={(open) => !open && setViewingContent(null)}
+        snapshot={viewingContent ? snapshots[viewingContent.urlId] : null}
+        urlName={viewingContent?.urlName || ""}
+      />
     </div>
   );
 };
