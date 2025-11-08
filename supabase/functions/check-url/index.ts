@@ -10,6 +10,9 @@ const corsHeaders = {
 // PDF text extraction function
 async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
+    // Disable worker for server-side environment
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = false;
+    
     // Load the PDF document
     const pdf = await pdfjsLib.getDocument({
       data: new Uint8Array(arrayBuffer),
