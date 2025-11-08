@@ -2,7 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
-import jsPDF from "https://esm.sh/jspdf@2.5.2";
+import { DOMParser } from "https://deno.land/x/deno_dom@v0.1.38/deno-dom-wasm.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -127,13 +127,42 @@ serve(async (req) => {
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
-        // For HTML, store the HTML content directly
-        console.log('Storing HTML content...');
+        // For HTML, we'll use a headless browser service to convert to PDF
+        console.log('Converting HTML to PDF using Browserless...');
         const htmlContent = await responseClone.text();
-        const htmlBytes = encoder.encode(htmlContent);
-        fileBuffer = htmlBytes.buffer;
-        fileType = 'text/html';
-        fileName = `${sanitizedUrl}_${timestamp}.html`;
+        
+        try {
+          // Use Browserless.io API to convert HTML to PDF
+          const browserlessResponse = await fetch('https://chrome.browserless.io/pdf', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              html: htmlContent,
+              options: {
+                printBackground: true,
+                format: 'A4',
+              }
+            })
+          });
+          
+          if (browserlessResponse.ok) {
+            fileBuffer = await browserlessResponse.arrayBuffer();
+            fileType = 'application/pdf';
+            fileName = `${sanitizedUrl}_${timestamp}.pdf`;
+            console.log('HTML converted to PDF successfully');
+          } else {
+            throw new Error('Browserless conversion failed');
+          }
+        } catch (error) {
+          console.error('PDF conversion failed:', error);
+          // Fallback: store as HTML
+          const htmlBytes = encoder.encode(htmlContent);
+          fileBuffer = htmlBytes.buffer;
+          fileType = 'text/html';
+          fileName = `${sanitizedUrl}_${timestamp}.html`;
+        }
       }
       
       const fileBlob = new Blob([fileBuffer], { type: fileType });
