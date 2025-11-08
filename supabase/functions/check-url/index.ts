@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
-import * as pdfjsLib from "https://esm.sh/pdfjs-dist@4.0.379";
+import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,16 +10,7 @@ const corsHeaders = {
 // PDF text extraction function
 async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
   try {
-    // Disable worker for server-side environment
-    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = false;
-    
-    // Load the PDF document
-    const pdf = await pdfjsLib.getDocument({
-      data: new Uint8Array(arrayBuffer),
-      useWorkerFetch: false,
-      isEvalSupported: false,
-    }).promise;
-
+    const pdf = await getDocument(new Uint8Array(arrayBuffer)).promise;
     let fullText = '';
 
     // Extract text from each page
