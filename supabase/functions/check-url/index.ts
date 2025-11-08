@@ -126,12 +126,42 @@ serve(async (req) => {
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
-        // For HTML, store the full HTML content for reference
+        // For HTML, store as PDF using jsPDF-like approach
+        console.log('Converting HTML to PDF...');
         const htmlContent = await responseClone.text();
-        const htmlBytes = encoder.encode(htmlContent);
-        fileBuffer = htmlBytes.buffer;
-        fileType = 'text/html';
-        fileName = `${sanitizedUrl}_${timestamp}.html`;
+        
+        // Use an HTML to PDF API service
+        const pdfApiResponse = await fetch('https://api.html2pdf.app/v1/generate', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            html: htmlContent,
+            format: 'A4',
+            printBackground: true,
+            margin: {
+              top: '20px',
+              right: '20px',
+              bottom: '20px',
+              left: '20px'
+            }
+          })
+        });
+        
+        if (pdfApiResponse.ok) {
+          fileBuffer = await pdfApiResponse.arrayBuffer();
+          fileType = 'application/pdf';
+          fileName = `${sanitizedUrl}_${timestamp}.pdf`;
+          console.log('HTML converted to PDF successfully');
+        } else {
+          // Fallback: store as HTML if conversion fails
+          console.log('PDF conversion failed, storing as HTML');
+          const htmlBytes = encoder.encode(htmlContent);
+          fileBuffer = htmlBytes.buffer;
+          fileType = 'text/html';
+          fileName = `${sanitizedUrl}_${timestamp}.html`;
+        }
       }
       
       const fileBlob = new Blob([fileBuffer], { type: fileType });
