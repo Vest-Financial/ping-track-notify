@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
+import jsPDF from "https://esm.sh/jspdf@2.5.2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -126,37 +127,41 @@ serve(async (req) => {
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
-        // For HTML, store as PDF using jsPDF-like approach
+        // For HTML, convert to PDF using jsPDF
         console.log('Converting HTML to PDF...');
         const htmlContent = await responseClone.text();
         
-        // Use an HTML to PDF API service
-        const pdfApiResponse = await fetch('https://api.html2pdf.app/v1/generate', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            html: htmlContent,
-            format: 'A4',
-            printBackground: true,
-            margin: {
-              top: '20px',
-              right: '20px',
-              bottom: '20px',
-              left: '20px'
-            }
-          })
-        });
-        
-        if (pdfApiResponse.ok) {
-          fileBuffer = await pdfApiResponse.arrayBuffer();
+        try {
+          // Create PDF with jsPDF
+          const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+          });
+          
+          // Add HTML content as text (basic conversion)
+          // Strip HTML tags and add as text
+          const textContent = htmlContent
+            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
+            .replace(/<[^>]+>/g, '\n')
+            .replace(/\n\s*\n/g, '\n')
+            .trim();
+          
+          doc.setFontSize(10);
+          const pageWidth = doc.internal.pageSize.getWidth() - 20;
+          const lines = doc.splitTextToSize(textContent, pageWidth);
+          doc.text(lines, 10, 10);
+          
+          // Get PDF as ArrayBuffer
+          const pdfOutput = doc.output('arraybuffer');
+          fileBuffer = pdfOutput;
           fileType = 'application/pdf';
           fileName = `${sanitizedUrl}_${timestamp}.pdf`;
           console.log('HTML converted to PDF successfully');
-        } else {
-          // Fallback: store as HTML if conversion fails
-          console.log('PDF conversion failed, storing as HTML');
+        } catch (error) {
+          console.error('PDF conversion failed:', error);
+          // Fallback: store as HTML
           const htmlBytes = encoder.encode(htmlContent);
           fileBuffer = htmlBytes.buffer;
           fileType = 'text/html';
