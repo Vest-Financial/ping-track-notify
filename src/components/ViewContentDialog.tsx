@@ -4,11 +4,11 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDistanceToNow } from "date-fns";
-import { Code, FileText, GitCompare, Check, Download } from "lucide-react";
+import { Code, FileText, GitCompare, Check, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DiffViewer } from "./DiffViewer";
 import { useToast } from "@/hooks/use-toast";
-import { ExternalLink } from "lucide-react";
+
 
 // Helper function to extract text from HTML
 const extractTextFromHtml = (html: string): string => {
@@ -124,29 +124,28 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
     return `${supabaseUrl}/storage/v1/object/public/content-pdfs/${filePath}`;
   };
 
-  const handleDownloadFile = async (filePath: string | null) => {
+  const handleViewFile = async (filePath: string | null) => {
     if (!filePath) return;
     
     try {
       const url = getFileUrl(filePath);
       if (!url) return;
       
-      // Download file directly to bypass ad blocker issues
+      // Fetch and create blob URL to bypass ad blocker
       const response = await fetch(url);
       const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filePath.split('/').pop() || 'captured-file';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Open in new tab
+      window.open(blobUrl, '_blank');
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      console.error('Error viewing file:', error);
       toast({
-        title: "Download failed",
-        description: "Could not download the file. Please try again.",
+        title: "Error",
+        description: "Could not open the file. Please try again.",
         variant: "destructive",
       });
     }
@@ -236,11 +235,11 @@ export const ViewContentDialog = ({ open, onOpenChange, snapshot, urlName }: Vie
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => handleDownloadFile(fullSnapshot.pdf_file_path)}
+                onClick={() => handleViewFile(fullSnapshot.pdf_file_path)}
                 className="inline-flex items-center gap-1"
               >
-                <Download className="h-3 w-3" />
-                Download File
+                <ExternalLink className="h-3 w-3" />
+                View File
               </Button>
             )}
           </DialogDescription>

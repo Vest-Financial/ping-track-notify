@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
-import { Trash2, GitCompare, Download } from "lucide-react";
+import { Trash2, GitCompare, ExternalLink } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DiffViewer } from "./DiffViewer";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ExternalLink } from "lucide-react";
+
 
 interface Snapshot {
   id: string;
@@ -75,29 +75,28 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
     return `${supabaseUrl}/storage/v1/object/public/content-pdfs/${filePath}`;
   };
 
-  const handleDownloadFile = async (filePath: string | null) => {
+  const handleViewFile = async (filePath: string | null) => {
     if (!filePath) return;
     
     try {
       const url = getFileUrl(filePath);
       if (!url) return;
       
-      // Download file directly to bypass ad blocker issues
+      // Fetch and create blob URL to bypass ad blocker
       const response = await fetch(url);
       const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-      a.download = filePath.split('/').pop() || 'captured-file';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
+      const blobUrl = window.URL.createObjectURL(blob);
+      
+      // Open in new tab
+      window.open(blobUrl, '_blank');
+      
+      // Clean up blob URL after a delay
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
-      console.error('Error downloading file:', error);
+      console.error('Error viewing file:', error);
       toast({
-        title: "Download failed",
-        description: "Could not download the file. Please try again.",
+        title: "Error",
+        description: "Could not open the file. Please try again.",
         variant: "destructive",
       });
     }
@@ -282,11 +281,11 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
                           <Button
                             variant="link"
                             size="sm"
-                            onClick={() => handleDownloadFile(snapshot.pdf_file_path)}
+                            onClick={() => handleViewFile(snapshot.pdf_file_path)}
                             className="h-auto p-0 text-xs text-primary hover:underline inline-flex items-center gap-1"
                           >
-                            <Download className="h-3 w-3" />
-                            Download Captured File
+                            <ExternalLink className="h-3 w-3" />
+                            View Captured File
                           </Button>
                         </div>
                       )}
