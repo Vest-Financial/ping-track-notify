@@ -10,9 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 interface AddUrlDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onUrlAdded?: () => void;
 }
 
-export const AddUrlDialog = ({ open, onOpenChange }: AddUrlDialogProps) => {
+export const AddUrlDialog = ({ open, onOpenChange, onUrlAdded }: AddUrlDialogProps) => {
   const [url, setUrl] = useState("");
   const [name, setName] = useState("");
   const [checkFrequency, setCheckFrequency] = useState("168");
@@ -69,6 +70,9 @@ export const AddUrlDialog = ({ open, onOpenChange }: AddUrlDialogProps) => {
       setYellowThreshold("0.3");
       setRedThreshold("0.5");
       onOpenChange(false);
+      
+      // Trigger refresh
+      onUrlAdded?.();
     } catch (error) {
       console.error("Error adding URL:", error);
       toast({

@@ -6,6 +6,7 @@ import { AddUrlDialog } from "@/components/AddUrlDialog";
 
 const Index = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/20">
@@ -30,11 +31,12 @@ const Index = () => {
           </Button>
         </div>
 
-        <UrlList />
+        <UrlList key={refreshTrigger} />
 
         <AddUrlDialog 
           open={isAddDialogOpen}
           onOpenChange={setIsAddDialogOpen}
+          onUrlAdded={() => setRefreshTrigger(prev => prev + 1)}
         />
       </div>
     </div>
