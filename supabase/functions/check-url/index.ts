@@ -79,6 +79,7 @@ serve(async (req) => {
       const arrayBuffer = await response.arrayBuffer();
       const pdfText = await extractTextFromPDF(arrayBuffer);
       cleanText = pdfText
+        .replace(/\0/g, '') // Remove null characters that PostgreSQL can't handle
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
       
