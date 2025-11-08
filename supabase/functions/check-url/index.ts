@@ -127,46 +127,13 @@ serve(async (req) => {
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
-        // For HTML, convert to PDF using jsPDF
-        console.log('Converting HTML to PDF...');
+        // For HTML, store the HTML content directly
+        console.log('Storing HTML content...');
         const htmlContent = await responseClone.text();
-        
-        try {
-          // Create PDF with jsPDF
-          const doc = new jsPDF({
-            orientation: 'portrait',
-            unit: 'mm',
-            format: 'a4'
-          });
-          
-          // Add HTML content as text (basic conversion)
-          // Strip HTML tags and add as text
-          const textContent = htmlContent
-            .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-            .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-            .replace(/<[^>]+>/g, '\n')
-            .replace(/\n\s*\n/g, '\n')
-            .trim();
-          
-          doc.setFontSize(10);
-          const pageWidth = doc.internal.pageSize.getWidth() - 20;
-          const lines = doc.splitTextToSize(textContent, pageWidth);
-          doc.text(lines, 10, 10);
-          
-          // Get PDF as ArrayBuffer
-          const pdfOutput = doc.output('arraybuffer');
-          fileBuffer = pdfOutput;
-          fileType = 'application/pdf';
-          fileName = `${sanitizedUrl}_${timestamp}.pdf`;
-          console.log('HTML converted to PDF successfully');
-        } catch (error) {
-          console.error('PDF conversion failed:', error);
-          // Fallback: store as HTML
-          const htmlBytes = encoder.encode(htmlContent);
-          fileBuffer = htmlBytes.buffer;
-          fileType = 'text/html';
-          fileName = `${sanitizedUrl}_${timestamp}.html`;
-        }
+        const htmlBytes = encoder.encode(htmlContent);
+        fileBuffer = htmlBytes.buffer;
+        fileType = 'text/html';
+        fileName = `${sanitizedUrl}_${timestamp}.html`;
       }
       
       const fileBlob = new Blob([fileBuffer], { type: fileType });

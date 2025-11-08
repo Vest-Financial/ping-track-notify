@@ -82,12 +82,15 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
       const url = getFileUrl(filePath);
       if (!url) return;
       
-      // Fetch and create blob URL to bypass ad blocker
+      // Fetch the file
       const response = await fetch(url);
       const arrayBuffer = await response.arrayBuffer();
       
-      // Create a blob with explicit PDF content type
-      const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+      // Determine content type from file extension
+      const contentType = filePath.endsWith('.pdf') ? 'application/pdf' : 'text/html';
+      
+      // Create a blob with the appropriate content type
+      const blob = new Blob([arrayBuffer], { type: contentType });
       const blobUrl = window.URL.createObjectURL(blob);
       
       // Open in new tab
