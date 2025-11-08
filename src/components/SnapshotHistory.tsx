@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { formatDistanceToNow } from "date-fns";
-import { Trash2, GitCompare } from "lucide-react";
+import { Trash2, GitCompare, Download } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { DiffViewer } from "./DiffViewer";
 import { useToast } from "@/hooks/use-toast";
@@ -73,6 +73,34 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
     if (!filePath) return null;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     return `${supabaseUrl}/storage/v1/object/public/content-pdfs/${filePath}`;
+  };
+
+  const handleDownloadFile = async (filePath: string | null) => {
+    if (!filePath) return;
+    
+    try {
+      const url = getFileUrl(filePath);
+      if (!url) return;
+      
+      // Download file directly to bypass ad blocker issues
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = filePath.split('/').pop() || 'captured-file';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Error downloading file:', error);
+      toast({
+        title: "Download failed",
+        description: "Could not download the file. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   useEffect(() => {
@@ -251,15 +279,15 @@ export const SnapshotHistory = ({ open, onOpenChange, urlId, urlName }: Snapshot
                       </div>
                       {snapshot.pdf_file_path && (
                         <div className="mt-1">
-                          <a
-                            href={getFileUrl(snapshot.pdf_file_path)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-xs text-primary hover:underline inline-flex items-center gap-1"
+                          <Button
+                            variant="link"
+                            size="sm"
+                            onClick={() => handleDownloadFile(snapshot.pdf_file_path)}
+                            className="h-auto p-0 text-xs text-primary hover:underline inline-flex items-center gap-1"
                           >
-                            View Captured File
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
+                            <Download className="h-3 w-3" />
+                            Download Captured File
+                          </Button>
                         </div>
                       )}
                     </div>
