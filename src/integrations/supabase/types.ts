@@ -24,6 +24,8 @@ export type Database = {
           created_at: string | null
           id: string
           monitored_url_id: string
+          resolved: boolean | null
+          resolved_at: string | null
           status_code: number | null
         }
         Insert: {
@@ -35,6 +37,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           monitored_url_id: string
+          resolved?: boolean | null
+          resolved_at?: string | null
           status_code?: number | null
         }
         Update: {
@@ -46,6 +50,8 @@ export type Database = {
           created_at?: string | null
           id?: string
           monitored_url_id?: string
+          resolved?: boolean | null
+          resolved_at?: string | null
           status_code?: number | null
         }
         Relationships: [

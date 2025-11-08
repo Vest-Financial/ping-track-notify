@@ -27,6 +27,7 @@ interface LatestSnapshot {
   content_text: string;
   content_length: number;
   status_code: number;
+  resolved: boolean;
 }
 
 export const UrlList = () => {
@@ -52,8 +53,9 @@ export const UrlList = () => {
         for (const url of data) {
           const { data: snapshotData } = await supabase
             .from("content_snapshots")
-            .select("alert_triggered, change_percentage, created_at, content_text, content_length, status_code")
+            .select("alert_triggered, change_percentage, created_at, content_text, content_length, status_code, resolved")
             .eq("monitored_url_id", url.id)
+            .eq("resolved", false) // Only show unresolved alerts
             .order("created_at", { ascending: false })
             .limit(1)
             .maybeSingle();
