@@ -36,12 +36,28 @@ serve(async (req) => {
 
     // Fetch the URL content
     const response = await fetch(monitoredUrl.url);
-    const contentText = await response.text();
+    const rawContent = await response.text();
     const statusCode = response.status;
+    const contentType = response.headers.get('content-type') || '';
 
-    // Calculate content hash
+    // Extract clean text based on content type
+    let cleanText = rawContent;
+    
+    if (contentType.includes('text/html')) {
+      // Extract text from HTML by removing tags
+      cleanText = rawContent
+        .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
+        .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '') // Remove styles
+        .replace(/<[^>]+>/g, ' ') // Remove all HTML tags
+        .replace(/\s+/g, ' ') // Normalize whitespace
+        .trim();
+    }
+    // Note: For PDFs and Word docs, you would need specialized parsing libraries
+    // or use a service that converts them to text format first
+
+    // Calculate content hash using the clean text
     const encoder = new TextEncoder();
-    const data = encoder.encode(contentText);
+    const data = encoder.encode(cleanText);
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     const contentHash = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -61,7 +77,7 @@ serve(async (req) => {
     if (lastSnapshot) {
       // Calculate change percentage
       const oldLength = lastSnapshot.content_length || 0;
-      const newLength = contentText.length;
+      const newLength = cleanText.length;
       changePercentage = oldLength > 0 
         ? Math.abs((newLength - oldLength) / oldLength) 
         : 0;
@@ -103,8 +119,8 @@ serve(async (req) => {
       .insert({
         monitored_url_id: urlId,
         content_hash: contentHash,
-        content_text: contentText.substring(0, 10000), // Store first 10k chars
-        content_length: contentText.length,
+        content_text: cleanText.substring(0, 10000), // Store first 10k chars of clean text
+        content_length: cleanText.length,
         status_code: statusCode,
         alert_triggered: alertLevel,
         change_percentage: changePercentage,
