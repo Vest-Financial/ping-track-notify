@@ -18,6 +18,7 @@ interface MonitoredUrl {
   is_active: boolean;
   yellow_threshold: number;
   red_threshold: number;
+  use_javascript_rendering: boolean;
   created_at: string;
 }
 
@@ -248,7 +249,7 @@ export const UrlList = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
               <div>
                 <p className="text-muted-foreground">Check Frequency</p>
                 <p className="font-medium flex items-center gap-1">
@@ -265,6 +266,12 @@ export const UrlList = () => {
                       })
                     : "Never"}
                 </p>
+              </div>
+              <div>
+                <p className="text-muted-foreground">Rendering</p>
+                <Badge variant={url.use_javascript_rendering ? "default" : "outline"}>
+                  {url.use_javascript_rendering ? "JavaScript" : "Static"}
+                </Badge>
               </div>
               <div>
                 <p className="text-muted-foreground">Thresholds</p>

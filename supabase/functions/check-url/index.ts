@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 import { getDocument } from "https://esm.sh/pdfjs-serverless@0.3.2";
 import { crypto } from "https://deno.land/std@0.177.0/crypto/mod.ts";
 import { jsPDF } from "https://esm.sh/jspdf@2.5.2";
+import puppeteer from "https://deno.land/x/puppeteer@16.2.0/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -19,12 +20,12 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
       const page = await pdf.getPage(pageNum);
       const textContent = await page.getTextContent();
-      
+
       // Combine all text items from the page
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
-      
+
       fullText += pageText + '\n';
     }
 
@@ -33,6 +34,60 @@ async function extractTextFromPDF(arrayBuffer: ArrayBuffer): Promise<string> {
     console.error('Error extracting text from PDF:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     throw new Error(`Failed to extract text from PDF: ${errorMessage}`);
+  }
+}
+
+// Fetch content with JavaScript rendering using Puppeteer
+async function fetchWithPuppeteer(url: string): Promise<{ content: string; contentType: string }> {
+  const browserlessApiKey = Deno.env.get('BROWSERLESS_API_KEY');
+
+  if (!browserlessApiKey) {
+    throw new Error('BROWSERLESS_API_KEY environment variable is not set');
+  }
+
+  console.log('Connecting to Browserless...');
+  const browser = await puppeteer.connect({
+    browserWSEndpoint: `wss://chrome.browserless.io?token=${browserlessApiKey}`
+  });
+
+  try {
+    const page = await browser.newPage();
+
+    // Set a reasonable timeout
+    await page.setDefaultNavigationTimeout(30000);
+
+    console.log(`Navigating to ${url} with Puppeteer...`);
+    const response = await page.goto(url, {
+      waitUntil: 'networkidle2' // Wait until network is idle (no more than 2 connections for 500ms)
+    });
+
+    if (!response) {
+      throw new Error('Failed to load page');
+    }
+
+    const contentType = response.headers()['content-type'] || 'text/html';
+
+    // If it's a PDF, get the buffer directly
+    if (contentType.includes('application/pdf')) {
+      const buffer = await response.buffer();
+      await browser.close();
+      return {
+        content: new TextDecoder().decode(buffer),
+        contentType: 'application/pdf'
+      };
+    }
+
+    // For HTML, get the fully rendered content
+    const content = await page.content();
+    await browser.close();
+
+    return {
+      content,
+      contentType: 'text/html'
+    };
+  } catch (error) {
+    await browser.close();
+    throw error;
   }
 }
 
@@ -64,34 +119,67 @@ serve(async (req) => {
 
     console.log(`Fetching content from: ${monitoredUrl.url}`);
 
-    // Fetch the URL content
-    const response = await fetch(monitoredUrl.url);
-    const statusCode = response.status;
-    const contentType = response.headers.get('content-type') || '';
-    
-    // Clone response to use body twice (once for PDF storage, once for text extraction)
-    const responseClone = response.clone();
+    let statusCode = 200;
+    let contentType = '';
+    let rawContent = '';
+    let responseForStorage: Response | null = null;
 
-    console.log(`Content-Type: ${contentType}`);
+    // Check if this URL is configured to use JavaScript rendering
+    const shouldUseJavaScript = monitoredUrl.use_javascript_rendering === true;
+    const browserlessAvailable = !!Deno.env.get('BROWSERLESS_API_KEY');
+    const usePuppeteer = shouldUseJavaScript && browserlessAvailable;
+
+    if (shouldUseJavaScript && !browserlessAvailable) {
+      console.warn('JavaScript rendering requested but BROWSERLESS_API_KEY not set. Falling back to regular fetch.');
+    }
+
+    if (usePuppeteer) {
+      try {
+        console.log('Using Puppeteer for JavaScript-rendered content...');
+        const puppeteerResult = await fetchWithPuppeteer(monitoredUrl.url);
+        rawContent = puppeteerResult.content;
+        contentType = puppeteerResult.contentType;
+        statusCode = 200;
+      } catch (puppeteerError) {
+        console.error('Puppeteer failed, falling back to regular fetch:', puppeteerError);
+        // Fall back to regular fetch
+        const response = await fetch(monitoredUrl.url);
+        statusCode = response.status;
+        contentType = response.headers.get('content-type') || '';
+        responseForStorage = response.clone();
+        rawContent = await response.text();
+      }
+    } else {
+      // Regular fetch without JavaScript rendering
+      const fetchMethod = shouldUseJavaScript ? 'regular fetch (Browserless unavailable)' : 'regular fetch';
+      console.log(`Using ${fetchMethod}...`);
+      const response = await fetch(monitoredUrl.url);
+      statusCode = response.status;
+      contentType = response.headers.get('content-type') || '';
+      responseForStorage = response.clone();
+      rawContent = await response.text();
+    }
+
+    console.log(`Content-Type: ${contentType}, Status: ${statusCode}`);
 
     // Extract clean text based on content type
     let cleanText = '';
-    
+
     if (contentType.includes('application/pdf')) {
       // Handle PDF files
       console.log('Detected PDF content, extracting text...');
-      
-      const arrayBuffer = await response.arrayBuffer();
+
+      const encoder = new TextEncoder();
+      const arrayBuffer = encoder.encode(rawContent).buffer;
       const pdfText = await extractTextFromPDF(arrayBuffer);
       cleanText = pdfText
         .replace(/\0/g, '') // Remove null characters that PostgreSQL can't handle
         .replace(/\s+/g, ' ') // Normalize whitespace
         .trim();
-      
+
       console.log(`Extracted ${cleanText.length} characters from PDF`);
     } else if (contentType.includes('text/html')) {
       // Handle HTML content
-      const rawContent = await response.text();
       cleanText = rawContent
         .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove scripts
         .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '') // Remove styles
@@ -100,7 +188,6 @@ serve(async (req) => {
         .trim();
     } else {
       // For other content types, try to get as text
-      const rawContent = await response.text();
       cleanText = rawContent.replace(/\s+/g, ' ').trim();
     }
 
@@ -115,45 +202,46 @@ serve(async (req) => {
     let pdfFilePath: string | null = null;
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const sanitizedUrl = monitoredUrl.url.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 50);
-    
+
     try {
       let fileBuffer: ArrayBuffer;
       let fileType: string;
       let fileName: string;
-      
+      const encoder = new TextEncoder();
+
       if (contentType.includes('application/pdf')) {
         // Already a PDF, just store it
-        fileBuffer = await responseClone.arrayBuffer();
+        const pdfBytes = encoder.encode(rawContent);
+        fileBuffer = pdfBytes.buffer;
         fileType = 'application/pdf';
         fileName = `${sanitizedUrl}_${timestamp}.pdf`;
       } else {
         // For HTML, convert to PDF using jsPDF
         console.log('Converting HTML to PDF...');
-        const htmlContent = await responseClone.text();
-        
+
         try {
           // Strip HTML tags and extract text content
-          const textContent = htmlContent
+          const textContent = rawContent
             .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
             .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
             .replace(/<[^>]+>/g, ' ')
             .replace(/\s+/g, ' ')
             .trim();
-          
+
           // Create PDF with jsPDF
           const doc = new jsPDF({
             orientation: 'portrait',
             unit: 'mm',
             format: 'a4'
           });
-          
+
           doc.setFontSize(10);
           const pageWidth = doc.internal.pageSize.getWidth() - 20;
           const pageHeight = doc.internal.pageSize.getHeight() - 20;
           const lineHeight = 5;
-          
+
           const lines = doc.splitTextToSize(textContent, pageWidth);
-          
+
           let y = 10;
           for (let i = 0; i < lines.length; i++) {
             if (y > pageHeight) {
@@ -163,7 +251,7 @@ serve(async (req) => {
             doc.text(lines[i], 10, y);
             y += lineHeight;
           }
-          
+
           // Get PDF as Uint8Array and convert to ArrayBuffer
           const pdfBytes = doc.output('arraybuffer');
           fileBuffer = pdfBytes;
@@ -173,7 +261,7 @@ serve(async (req) => {
         } catch (error) {
           console.error('PDF conversion failed:', error);
           // Fallback: store as HTML
-          const htmlBytes = encoder.encode(htmlContent);
+          const htmlBytes = encoder.encode(rawContent);
           fileBuffer = htmlBytes.buffer;
           fileType = 'text/html';
           fileName = `${sanitizedUrl}_${timestamp}.html`;

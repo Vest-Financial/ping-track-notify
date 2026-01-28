@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -21,6 +22,7 @@ export const AddUrlDialog = ({ open, onOpenChange, onUrlAdded }: AddUrlDialogPro
   const [webhookPayload, setWebhookPayload] = useState("");
   const [yellowThreshold, setYellowThreshold] = useState("0.3");
   const [redThreshold, setRedThreshold] = useState("0.5");
+  const [useJavaScriptRendering, setUseJavaScriptRendering] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { toast } = useToast();
 
@@ -52,6 +54,7 @@ export const AddUrlDialog = ({ open, onOpenChange, onUrlAdded }: AddUrlDialogPro
         alert_webhook_payload: parsedPayload,
         yellow_threshold: parseFloat(yellowThreshold),
         red_threshold: parseFloat(redThreshold),
+        use_javascript_rendering: useJavaScriptRendering,
       });
 
       if (error) throw error;
@@ -69,6 +72,7 @@ export const AddUrlDialog = ({ open, onOpenChange, onUrlAdded }: AddUrlDialogPro
       setWebhookPayload("");
       setYellowThreshold("0.3");
       setRedThreshold("0.5");
+      setUseJavaScriptRendering(false);
       onOpenChange(false);
       
       // Trigger refresh
@@ -131,6 +135,22 @@ export const AddUrlDialog = ({ open, onOpenChange, onUrlAdded }: AddUrlDialogPro
             <p className="text-sm text-muted-foreground mt-1">
               Default: 168 hours (1 week)
             </p>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="javascript-rendering"
+              checked={useJavaScriptRendering}
+              onCheckedChange={setUseJavaScriptRendering}
+            />
+            <div className="flex flex-col">
+              <Label htmlFor="javascript-rendering" className="cursor-pointer">
+                Enable JavaScript Rendering
+              </Label>
+              <p className="text-sm text-muted-foreground">
+                Use Puppeteer/Browserless to render pages with JavaScript. Enable for sites that load content dynamically.
+              </p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
